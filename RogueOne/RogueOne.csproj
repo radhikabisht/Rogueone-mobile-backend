@@ -229,6 +229,8 @@
     <Compile Include="Areas\HelpPage\XmlDocumentationProvider.cs" />
     <Compile Include="Controllers\AccountController.cs" />
     <Compile Include="Controllers\HomeController.cs" />
+    <Compile Include="Models\Settings.cs" />
+    <Compile Include="ViewModels\HomeScreenViewModel.cs" />
     <Compile Include="Controllers\LocationDiaryController.cs" />
     <Compile Include="Controllers\ValuesController.cs" />
     <Compile Include="Global.asax.cs">

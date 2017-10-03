@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNet.Identity;
 using RogueOne.Models;
+using RogueOne.ViewModels;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,39 +18,81 @@ namespace RogueOne.Controllers
         ApplicationDbContext db = new ApplicationDbContext();
         //GET api/User/Diary
         [Route("Diary")]
-        public async Task<IHttpActionResult> Diary() {
-
-            var username = User.Identity.GetUserId();
-            ApplicationUser user = db.Users.FirstOrDefault(x=>x.Id == username);
-            var userid = user.UserName;
-            return null;
+        public HomeScreenViewModel GetDiary() {
+            var userId = User.Identity.GetUserId();
+            ApplicationUser user = db.Users.FirstOrDefault(x=>x.Id == userId);
+            return new HomeScreenViewModel() {
+                Diary = user.Diary,
+                TripEntries = user.Trips,
+                UserSettings = user.UserSettings,
+                PendingRequests = user.PendingRequests==null?0:user.PendingRequests.Count,
+                NoOfFriends = user.Friends==null?0:user.Friends.Count
+            };
         }
         //GET api/User/GetAppUsers
         [Route("GetAppUsers")]
         [System.Web.Mvc.OutputCache(Duration = 1000, VaryByParam = "none")]
-        public IHttpActionResult GetAppUsers() {
-            return null;
+        public List<string> GetAppUsers() {
+            List<string> users = new List<string>();
+            var userId = User.Identity.GetUserId();
+            ApplicationUser user = db.Users.Find(userId);
+            List<string> Friends = user.Friends.Select(x => x.Id).ToList();
+            Friends.Add(userId);
+            List<string> PotFriends;
+            if (Friends != null)
+                PotFriends = db.Users.Where(x => !Friends.Contains(x.Id)).Select(x => x.UserName).ToList();
+            else
+                PotFriends = db.Users.Where(x => x.Id!=userId).Select(x => x.UserName).ToList();
+            return PotFriends;
         }
         //GET api/User/FriendList
         [Route("FriendList")]
-        public async Task<IHttpActionResult> FriendList() {
+        public List<FriendViewModel> FriendList() {
             return null;
         }
         //POST api/User/AddFriend
         [Route("AddFriend")]
-        public async Task<IHttpActionResult> AddFriend(string Username)
+        public IHttpActionResult AddFriend(string Username)
         {
-            return null;
+            try
+            {
+                var userId = User.Identity.GetUserId();
+                var Acceptor = db.Users.FirstOrDefault(x => x.UserName == Username);
+                var Requestor = db.Users.Find(userId);
+                Request pendingRequest = new Request() {
+                    Accepted = false,
+                    Acceptor = Acceptor,
+                    Requestor = Requestor
+                };
+                Acceptor.PendingRequests.Add(pendingRequest);
+                Requestor.ConnectRequests.Add(pendingRequest);
+                db.SaveChanges();
+                return Ok();
+            }
+            catch (Exception e) {
+                return BadRequest(e.Message);
+            }
         }
         //GET api/User/PendingRequests
         [Route("PendingRequests")]
-        public async Task<IHttpActionResult> PendingRequests()
+        public List<RequestViewModel> PendingRequests()
         {
-            return null;
+            var userId = User.Identity.GetUserId();
+            var AppUser = db.Users.Find(userId);
+            List<RequestViewModel> prs = AppUser
+                .PendingRequests
+                .Select(x => new RequestViewModel
+                {
+                    UserName = x.Requestor.UserName,
+                    Status = x.Accepted,
+                    Avatar = x.Requestor.Avatar
+                }).ToList();
+ 
+            return prs;
         }
         //POST api/User/CreateTrip
         [Route("CreateTrip")]
-        public async Task<IHttpActionResult> CreateTrip()
+        public IHttpActionResult CreateTrip(Trip tripData)
         {
             return null;
         }
@@ -72,4 +115,6 @@ namespace RogueOne.Controllers
             return null;
         }
     }
+
+
 }

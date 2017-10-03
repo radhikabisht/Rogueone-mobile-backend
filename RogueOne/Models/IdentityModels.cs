@@ -5,17 +5,22 @@ using Microsoft.AspNet.Identity.EntityFramework;
 using Microsoft.AspNet.Identity.Owin;
 using System.Data.Entity;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace RogueOne.Models
 {
     // You can add profile data for the user by adding more properties to your ApplicationUser class, please visit https://go.microsoft.com/fwlink/?LinkID=317594 to learn more.
     public class ApplicationUser : IdentityUser
     {
+        public string Avatar { get; set; }
         public virtual List<DiaryEntry> Diary { get; set; }
         public virtual List<Request> ConnectRequests { get; set; }
         public virtual List<Request> PendingRequests { get; set; }
         public virtual List<ApplicationUser> Friends { get; set; }
         public virtual List<Trip> Trips { get; set; }
+        [ForeignKey("UserSettings")]
+        public long SettingsID { get; set; }
+        public virtual Settings UserSettings { get; set; }
 
         public async Task<ClaimsIdentity> GenerateUserIdentityAsync(UserManager<ApplicationUser> manager, string authenticationType)
         {
