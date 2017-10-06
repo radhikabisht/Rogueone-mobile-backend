@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -15,7 +15,7 @@ namespace RogueOne.Models
         public long LocationID { get; set; }
         public virtual Location Location { get; set; }
         public virtual List<Badge> LocationBadge { get; set; }
-        
+        public string Comments { get; set; }
     }
 
     public class Badge
