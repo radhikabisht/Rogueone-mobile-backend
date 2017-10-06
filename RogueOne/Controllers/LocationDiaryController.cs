@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNet.Identity;
+using Microsoft.AspNet.Identity;
 using RogueOne.Models;
 using RogueOne.ViewModels;
 using System;
@@ -20,13 +20,13 @@ namespace RogueOne.Controllers
         [Route("Diary")]
         public HomeScreenViewModel GetDiary() {
             var userId = User.Identity.GetUserId();
-            ApplicationUser user = db.Users.FirstOrDefault(x=>x.Id == userId);
+            ApplicationUser user = db.Users.FirstOrDefault(x => x.Id == userId);
             return new HomeScreenViewModel() {
                 Diary = user.Diary,
                 TripEntries = user.Trips,
                 UserSettings = user.UserSettings,
-                PendingRequests = user.PendingRequests==null?0:user.PendingRequests.Count,
-                NoOfFriends = user.Friends==null?0:user.Friends.Count
+                PendingRequests = user.PendingRequests == null ? 0 : user.PendingRequests.Count,
+                NoOfFriends = user.Friends == null ? 0 : user.Friends.Count
             };
         }
         //GET api/User/AppUsers
@@ -42,7 +42,7 @@ namespace RogueOne.Controllers
             if (Friends != null)
                 PotFriends = db.Users.Where(x => !Friends.Contains(x.Id)).Select(x => x.UserName).ToList();
             else
-                PotFriends = db.Users.Where(x => x.Id!=userId).Select(x => x.UserName).ToList();
+                PotFriends = db.Users.Where(x => x.Id != userId).Select(x => x.UserName).ToList();
             return PotFriends;
         }
         [HttpGet]
@@ -138,11 +138,31 @@ namespace RogueOne.Controllers
         {
             return null;
         }
+        [HttpGet]
         //GET api/User/DiaryEntries
         [Route("DiaryEntries")]
-        public List<DiaryEntryViewModel> DiaryEntries()
+        public List<LocationEntryViewModel> DiaryEntries()
         {
-            return null;
+            var userId = User.Identity.GetUserId();
+            var AppUser = db.Users.Find(userId);
+            List<LocationEntryViewModel> diary = new List<LocationEntryViewModel>();
+            if (AppUser.Diary != null && AppUser.Diary.Count != 0) {
+                foreach (LocationEntry entry in AppUser.Diary) {
+                    var diaryEntry = new LocationEntryViewModel()
+                    {
+                        Address = entry.Location.DisplayFriendlyName,
+                        BadgeNames = entry.LocationBadge.Select(x => x.BadgeName).ToList(),
+                        CheckIns = entry.Visits.Select(x => x.DateCreated.ToString()).ToList(),
+                        Latitude = entry.Location.Latitude,
+                        Longitude = entry.Location.Longitude,
+                        DateCreated = entry.DateCreated.ToString(),
+                        Comments = entry.Comments,
+                        LocationEntryID = entry.DiaryEntryID
+                    };
+                    diary.Add(diaryEntry);
+                }
+            }
+            return diary;
         }
         [HttpPost]
         [Route("createEntry")]
