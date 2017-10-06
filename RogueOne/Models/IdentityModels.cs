@@ -13,7 +13,7 @@ namespace RogueOne.Models
     public class ApplicationUser : IdentityUser
     {
         public string Avatar { get; set; }
-        public virtual List<DiaryEntry> Diary { get; set; }
+        public virtual List<LocationEntry> Diary { get; set; }
         public virtual List<Request> ConnectRequests { get; set; }
         public virtual List<Request> PendingRequests { get; set; }
         public virtual List<ApplicationUser> Friends { get; set; }
@@ -39,7 +39,20 @@ namespace RogueOne.Models
         {
 
         }
-        public DbSet<DiaryEntry> DiaryEntries { get; set; }
+        protected override void OnModelCreating(DbModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<ApplicationUser>()
+                .HasMany(u => u.Friends)
+                .WithMany()
+                .Map(m =>
+                {
+                    m.MapLeftKey("FriendID");
+                    m.MapRightKey("RelatedID");
+                    m.ToTable("Friend_related");
+                });
+            base.OnModelCreating(modelBuilder);
+        }
+        public DbSet<LocationEntry> LocationEntries { get; set; }
         public DbSet<Request> Requests { get; set; }
         public DbSet<CheckIn> CheckIns { get; set; }
         public DbSet<Location> Locations { get; set; }

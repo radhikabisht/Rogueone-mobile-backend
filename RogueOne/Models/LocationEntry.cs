@@ -5,7 +5,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace RogueOne.Models
 {
-    public class DiaryEntry
+    public class LocationEntry
     {
         [Key]
         public long DiaryEntryID { get; set; }

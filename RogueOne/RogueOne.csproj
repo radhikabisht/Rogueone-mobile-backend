@@ -230,6 +230,8 @@
     <Compile Include="Controllers\AccountController.cs" />
     <Compile Include="Controllers\HomeController.cs" />
     <Compile Include="Models\Settings.cs" />
+    <Compile Include="ViewModels\DiaryEntryViewModel.cs" />
+    <Compile Include="ViewModels\FriendViewModel.cs" />
     <Compile Include="ViewModels\HomeScreenViewModel.cs" />
     <Compile Include="Controllers\LocationDiaryController.cs" />
     <Compile Include="Controllers\ValuesController.cs" />
@@ -240,7 +242,7 @@
     <Compile Include="Models\AccountBindingModels.cs" />
     <Compile Include="Models\AccountViewModels.cs" />
     <Compile Include="Models\CheckIn.cs" />
-    <Compile Include="Models\DiaryEntry.cs" />
+    <Compile Include="Models\LocationEntry.cs" />
     <Compile Include="Models\IdentityModels.cs" />
     <Compile Include="Models\Location.cs" />
     <Compile Include="Models\Request.cs" />
@@ -249,6 +251,8 @@
     <Compile Include="Providers\ApplicationOAuthProvider.cs" />
     <Compile Include="Results\ChallengeResult.cs" />
     <Compile Include="Startup.cs" />
+    <Compile Include="ViewModels\LocationEntryViewModel.cs" />
+    <Compile Include="ViewModels\RequestViewModel.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Areas\HelpPage\HelpPage.css" />
@@ -310,7 +314,6 @@
     <Content Include="Views\Shared\Error.cshtml" />
     <Content Include="Views\Shared\_Layout.cshtml" />
   </ItemGroup>
-  <ItemGroup />
   <ItemGroup>
     <Content Include="fonts\glyphicons-halflings-regular.woff" />
   </ItemGroup>

@@ -29,8 +29,8 @@ namespace RogueOne.Controllers
                 NoOfFriends = user.Friends==null?0:user.Friends.Count
             };
         }
-        //GET api/User/GetAppUsers
-        [Route("GetAppUsers")]
+        //GET api/User/AppUsers
+        [Route("AppUsers")]
         [System.Web.Mvc.OutputCache(Duration = 1000, VaryByParam = "none")]
         public List<string> GetAppUsers() {
             List<string> users = new List<string>();
@@ -45,14 +45,25 @@ namespace RogueOne.Controllers
                 PotFriends = db.Users.Where(x => x.Id!=userId).Select(x => x.UserName).ToList();
             return PotFriends;
         }
+        [HttpGet]
+        [Route("getMyTrips")]
+        public List<String> getMyTrips() {
+            var userId = User.Identity.GetUserId();
+            List<String> tripnames = db.Users.Find(userId).Trips.Select(x => x.TripName).ToList();
+            return tripnames;
+        }
+        [HttpGet]
         //GET api/User/FriendList
         [Route("FriendList")]
-        public List<FriendViewModel> FriendList() {
-            return null;
+        public List<String> FriendList() {
+            var userId = User.Identity.GetUserId();
+            List<String> friends = db.Users.Find(userId).Friends.Select(x => x.UserName).ToList();
+            return friends;
         }
+        [HttpPost]
         //POST api/User/AddFriend
-        [Route("AddFriend")]
-        public IHttpActionResult AddFriend(string Username)
+        [Route("FriendRequest")]
+        public IHttpActionResult AddFriend([FromBody]string Username)
         {
             try
             {
@@ -64,6 +75,10 @@ namespace RogueOne.Controllers
                     Acceptor = Acceptor,
                     Requestor = Requestor
                 };
+                if (Acceptor.PendingRequests.Select(x => x.Requestor.UserName).Contains(Requestor.UserName))
+                {
+                    return BadRequest("friend request already sent");
+                }
                 Acceptor.PendingRequests.Add(pendingRequest);
                 Requestor.ConnectRequests.Add(pendingRequest);
                 db.SaveChanges();
@@ -73,21 +88,48 @@ namespace RogueOne.Controllers
                 return BadRequest(e.Message);
             }
         }
+        [HttpPost]
+        //POST api/User/ConfirmRequest
+        [Route("ConfirmRequest")]
+        public IHttpActionResult ConfirmRequest([FromBody]string Username)
+        {
+            try
+            {
+                var userId = User.Identity.GetUserId();
+                var Requestor = db.Users.FirstOrDefault(x => x.UserName == Username);
+                var Acceptor = db.Users.Find(userId);
+                var ConnectRequest = Requestor
+                    .ConnectRequests
+                    .Where(x => x.AcceptorID == Acceptor.Id)
+                    .FirstOrDefault();
+                if (ConnectRequest == null || ConnectRequest.Accepted) {
+                    return BadRequest("Invalid Request");
+                }
+                else
+                {
+                    ConnectRequest.Accepted = true;
+                }
+                Acceptor.Friends.Add(Requestor);
+                Requestor.Friends.Add(Acceptor);
+                db.SaveChanges();
+                return Ok();
+            }
+            catch (Exception e)
+            {
+                return BadRequest(e.Message);
+            }
+        }
+        [HttpGet]
         //GET api/User/PendingRequests
         [Route("PendingRequests")]
-        public List<RequestViewModel> PendingRequests()
+        public List<String> PendingRequests()
         {
             var userId = User.Identity.GetUserId();
             var AppUser = db.Users.Find(userId);
-            List<RequestViewModel> prs = AppUser
+            List<String> prs = AppUser
                 .PendingRequests
-                .Select(x => new RequestViewModel
-                {
-                    UserName = x.Requestor.UserName,
-                    Status = x.Accepted,
-                    Avatar = x.Requestor.Avatar
-                }).ToList();
- 
+                .Where(x => !x.Accepted)
+                .Select(x => x.Requestor.UserName).ToList();
             return prs;
         }
         //POST api/User/CreateTrip
@@ -98,23 +140,160 @@ namespace RogueOne.Controllers
         }
         //GET api/User/DiaryEntries
         [Route("DiaryEntries")]
-        public async Task<IHttpActionResult> DiaryEntries()
+        public List<DiaryEntryViewModel> DiaryEntries()
         {
             return null;
         }
+        [HttpPost]
+        [Route("createEntry")]
+        public IHttpActionResult createEntry(LocationEntryViewModel location) {
+            if (location == null) {
+                return BadRequest();
+            }
+            try
+            {
+                var userId = User.Identity.GetUserId();
+                var AppUser = db.Users.Find(userId);
+                if (location.tripName == null || location.tripName == "")
+                {
+                    LocationEntry entry = AppUser.Diary
+                        .Where(x => x.Location.DisplayFriendlyName == location.Address)
+                        .FirstOrDefault();
+                    if (!createLocationEntry(location, entry, AppUser))
+                    {
+                        return BadRequest();
+                    };
+
+                }
+                else
+                {
+                    LocationEntry tripentry = AppUser
+                        .Trips
+                        .SelectMany(x => x.TripEntries)
+                        .Where(x => x.Location.DisplayFriendlyName == location.Address)
+                        .FirstOrDefault();
+                    if (!createTripEntry(location, tripentry, AppUser))
+                    {
+                        return BadRequest();
+                    };
+                }
+                return Ok();
+            }
+            catch (Exception e)
+            {
+                return BadRequest(e.Message);
+            }
+
+        }
+
+        private bool createTripEntry(LocationEntryViewModel location, LocationEntry entry, ApplicationUser user)
+        {
+            Location loc = new Location()
+            {
+                DisplayFriendlyName = location.Address,
+                Latitude = location.Latitude,
+                Longitude = location.Longitude,
+            };
+            CheckIn checkIn = new CheckIn()
+            {
+                DateCreated = DateTime.Now,
+                Location = loc,
+            };
+            List<CheckIn> visits = new List<CheckIn>() { checkIn };
+            List<Badge> badges = new List<Badge>();
+            List<Badge> badgesInDb = db.Badges.ToList();
+            Trip trip = user.Trips.Where(x => x.TripName == location.tripName).FirstOrDefault();
+            if (trip == null) {
+                return false;
+            }
+            foreach (string badge in location.BadgeNames)
+            {
+                if (badgesInDb.Where(x => x.BadgeName == badge) == null)
+                {
+                    badges.Add(new Badge() { BadgeName = badge });
+                }
+                else {
+                    badges.Add(badgesInDb.Where(x => x.BadgeName == badge).FirstOrDefault());
+                }
+            }
+            if (entry == null)
+            {
+                entry = new LocationEntry()
+                {
+                    DateCreated = DateTime.Now,
+                    Location = loc,
+                    LocationBadge = badges,
+                    Visits = visits,
+                };
+                trip.TripEntries.Add(entry);
+            }
+            else
+            {
+                entry.Visits.Add(checkIn);
+                entry.LocationBadge = badges;
+            }
+            db.SaveChanges();
+            return true;
+        }
+
+        private bool createLocationEntry(LocationEntryViewModel location, LocationEntry entry,ApplicationUser user)
+        {
+            Location loc = new Location()
+            {
+                DisplayFriendlyName = location.Address,
+                Latitude = location.Latitude,
+                Longitude = location.Longitude,
+            };
+            CheckIn checkIn = new CheckIn()
+            {
+                DateCreated = DateTime.Now,
+                Location = loc,
+            };
+            List<CheckIn> visits = new List<CheckIn>() { checkIn };
+            List<Badge> badges = new List<Badge>();
+            List<Badge> badgesInDb = db.Badges.ToList();
+            foreach (string badge in location.BadgeNames)
+            {
+                if (badgesInDb.Where(x => x.BadgeName == badge) == null)
+                {
+                    badges.Add(new Badge() { BadgeName = badge });
+                }
+            }
+            if (entry == null)
+            {
+                entry = new LocationEntry()
+                {
+                    DateCreated = DateTime.Now,
+                    Location = loc,
+                    LocationBadge = badges,
+                    Visits = visits,
+                };
+                user.Diary.Add(entry);
+            }
+            else
+            {
+                entry.Visits.Add(checkIn);
+                entry.LocationBadge = badges;
+            }
+            db.SaveChanges();
+            return true;
+        }
+
         //GET api/User/GetTrips
-        [Route("GetTrips")]
-        public async Task<IHttpActionResult> GetTrips()
+        [Route("Trips")]
+        public List<TripView> GetTrips()
         {
             return null;
         }
         //GET api/User/TripInfo
         [Route("TripInfo")]
-        public async Task<IHttpActionResult> TripInfo(long tripID)
+        public Trip TripInfo(long tripID)
         {
             return null;
         }
     }
 
-
+    public class TripView
+    {
+    }
 }
