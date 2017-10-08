@@ -232,7 +232,6 @@
     <Compile Include="Models\Settings.cs" />
     <Compile Include="ViewModels\DiaryEntryViewModel.cs" />
     <Compile Include="ViewModels\FriendViewModel.cs" />
-    <Compile Include="ViewModels\HomeScreenViewModel.cs" />
     <Compile Include="Controllers\LocationDiaryController.cs" />
     <Compile Include="Controllers\ValuesController.cs" />
     <Compile Include="Global.asax.cs">
@@ -253,6 +252,7 @@
     <Compile Include="Startup.cs" />
     <Compile Include="ViewModels\LocationEntryViewModel.cs" />
     <Compile Include="ViewModels\RequestViewModel.cs" />
+    <Compile Include="ViewModels\TripView.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Areas\HelpPage\HelpPage.css" />
