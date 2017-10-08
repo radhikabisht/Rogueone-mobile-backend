@@ -17,6 +17,7 @@ namespace RogueOne.Models
         public virtual List<Request> ConnectRequests { get; set; }
         public virtual List<Request> PendingRequests { get; set; }
         public virtual List<ApplicationUser> Friends { get; set; }
+        public virtual LocationEntry emergencyCheckIn { get; set; }
         public virtual List<Trip> Trips { get; set; }
         [ForeignKey("UserSettings")]
         public long SettingsID { get; set; }

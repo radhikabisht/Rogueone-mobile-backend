@@ -27,6 +27,5 @@ namespace RogueOne.Models
         public long TripMateID { get; set; }
         public string Name { get; set; }
         public long PhoneNumber { get; set; }
-        public string Email { get; set; }
     }
 }
