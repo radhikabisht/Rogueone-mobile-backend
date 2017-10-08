@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNet.Identity;
+using Microsoft.AspNet.Identity;
 using RogueOne.Models;
 using RogueOne.ViewModels;
 using System;
@@ -16,19 +16,7 @@ namespace RogueOne.Controllers
     public class LocationDiaryController : ApiController
     {
         ApplicationDbContext db = new ApplicationDbContext();
-        //GET api/User/Diary
-        [Route("Diary")]
-        public HomeScreenViewModel GetDiary() {
-            var userId = User.Identity.GetUserId();
-            ApplicationUser user = db.Users.FirstOrDefault(x=>x.Id == userId);
-            return new HomeScreenViewModel() {
-                Diary = user.Diary,
-                TripEntries = user.Trips,
-                UserSettings = user.UserSettings,
-                PendingRequests = user.PendingRequests==null?0:user.PendingRequests.Count,
-                NoOfFriends = user.Friends==null?0:user.Friends.Count
-            };
-        }
+        
         //GET api/User/AppUsers
         [Route("AppUsers")]
         [System.Web.Mvc.OutputCache(Duration = 1000, VaryByParam = "none")]
@@ -42,7 +30,7 @@ namespace RogueOne.Controllers
             if (Friends != null)
                 PotFriends = db.Users.Where(x => !Friends.Contains(x.Id)).Select(x => x.UserName).ToList();
             else
-                PotFriends = db.Users.Where(x => x.Id!=userId).Select(x => x.UserName).ToList();
+                PotFriends = db.Users.Where(x => x.Id != userId).Select(x => x.UserName).ToList();
             return PotFriends;
         }
         [HttpGet]
@@ -59,6 +47,20 @@ namespace RogueOne.Controllers
             var userId = User.Identity.GetUserId();
             List<String> friends = db.Users.Find(userId).Friends.Select(x => x.UserName).ToList();
             return friends;
+        }
+        [HttpPost]
+        //POST api/User/AddFriend
+        [Route("declineRequest")]
+        public IHttpActionResult declineRequest([FromBody]string Username)
+        {
+            var userId = User.Identity.GetUserId();
+            var Acceptor = db.Users.FirstOrDefault(x => x.UserName == Username);
+            var Requestor = db.Users.Find(userId);
+            var pen =  Acceptor.PendingRequests.Where(x => x.Requestor == Requestor).FirstOrDefault();
+            var req = Requestor.ConnectRequests.Where(x => x.Acceptor == Acceptor).FirstOrDefault();
+            Requestor.ConnectRequests.Remove(req);
+            Acceptor.PendingRequests.Remove(pen);
+            return Ok();
         }
         [HttpPost]
         //POST api/User/AddFriend
@@ -132,17 +134,31 @@ namespace RogueOne.Controllers
                 .Select(x => x.Requestor.UserName).ToList();
             return prs;
         }
-        //POST api/User/CreateTrip
-        [Route("CreateTrip")]
-        public IHttpActionResult CreateTrip(Trip tripData)
-        {
-            return null;
-        }
+        [HttpGet]
         //GET api/User/DiaryEntries
         [Route("DiaryEntries")]
-        public List<DiaryEntryViewModel> DiaryEntries()
+        public List<LocationEntryViewModel> DiaryEntries()
         {
-            return null;
+            var userId = User.Identity.GetUserId();
+            var AppUser = db.Users.Find(userId);
+            List<LocationEntryViewModel> diary = new List<LocationEntryViewModel>();
+            if (AppUser.Diary != null && AppUser.Diary.Count != 0) {
+                foreach (LocationEntry entry in AppUser.Diary) {
+                    var diaryEntry = new LocationEntryViewModel()
+                    {
+                        Address = entry.Location.DisplayFriendlyName,
+                        BadgeNames = entry.LocationBadge.Select(x => x.BadgeName).ToList(),
+                        CheckIns = entry.Visits.Select(x => x.DateCreated.ToString()).ToList(),
+                        Latitude = entry.Location.Latitude,
+                        Longitude = entry.Location.Longitude,
+                        DateCreated = entry.DateCreated.ToString(),
+                        Comments = entry.Comments,
+                        LocationEntryID = entry.DiaryEntryID
+                    };
+                    diary.Add(diaryEntry);
+                }
+            }
+            return diary;
         }
         [HttpPost]
         [Route("createEntry")]
@@ -154,7 +170,7 @@ namespace RogueOne.Controllers
             {
                 var userId = User.Identity.GetUserId();
                 var AppUser = db.Users.Find(userId);
-                if (location.tripName == null || location.tripName == "")
+                if (location.tripName == null || location.tripName == "" || location.tripName == "My Diary")
                 {
                     LocationEntry entry = AppUser.Diary
                         .Where(x => x.Location.DisplayFriendlyName == location.Address)
@@ -169,6 +185,7 @@ namespace RogueOne.Controllers
                 {
                     LocationEntry tripentry = AppUser
                         .Trips
+                        .Where(x => x.TripName == location.tripName)
                         .SelectMany(x => x.TripEntries)
                         .Where(x => x.Location.DisplayFriendlyName == location.Address)
                         .FirstOrDefault();
@@ -224,6 +241,7 @@ namespace RogueOne.Controllers
                     Location = loc,
                     LocationBadge = badges,
                     Visits = visits,
+                    Comments = location.Comments
                 };
                 trip.TripEntries.Add(entry);
             }
@@ -254,10 +272,7 @@ namespace RogueOne.Controllers
             List<Badge> badgesInDb = db.Badges.ToList();
             foreach (string badge in location.BadgeNames)
             {
-                if (badgesInDb.Where(x => x.BadgeName == badge) == null)
-                {
-                    badges.Add(new Badge() { BadgeName = badge });
-                }
+                badges.Add(new Badge() { BadgeName = badge });
             }
             if (entry == null)
             {
@@ -267,6 +282,7 @@ namespace RogueOne.Controllers
                     Location = loc,
                     LocationBadge = badges,
                     Visits = visits,
+                    Comments = location.Comments
                 };
                 user.Diary.Add(entry);
             }
@@ -278,22 +294,239 @@ namespace RogueOne.Controllers
             db.SaveChanges();
             return true;
         }
-
+        [HttpGet]
+        //GET api/User/DiaryEntries
+        [Route("UserDiaryEntries")]
+        public List<LocationEntryViewModel> UserDiaryEntries(string Username)
+        {
+            string userId = User.Identity.GetUserId();
+            var AppUser = db.Users.Find(userId);
+            if (Username != null && Username != "")
+            {
+                if (!db.Users.Where(x => x.UserName == Username).FirstOrDefault().UserSettings.Safemode)
+                {
+                    AppUser = db.Users.Where(x => x.UserName == Username).FirstOrDefault();
+                }
+                else {
+                    return null;
+                }
+            }
+            List<LocationEntryViewModel> diary = new List<LocationEntryViewModel>();
+            if (AppUser.Diary != null && AppUser.Diary.Count != 0)
+            {
+                foreach (LocationEntry entry in AppUser.Diary)
+                {
+                    var diaryEntry = new LocationEntryViewModel()
+                    {
+                        Address = entry.Location.DisplayFriendlyName,
+                        BadgeNames = entry.LocationBadge.Select(x => x.BadgeName).ToList(),
+                        CheckIns = entry.Visits.Select(x => x.DateCreated.ToString()).ToList(),
+                        Latitude = entry.Location.Latitude,
+                        Longitude = entry.Location.Longitude,
+                        DateCreated = entry.DateCreated.ToString(),
+                        Comments = entry.Comments,
+                        LocationEntryID = entry.DiaryEntryID
+                    };
+                    diary.Add(diaryEntry);
+                }
+            }
+            return diary;
+        }
         //GET api/User/GetTrips
-        [Route("Trips")]
+        [Route("GetUserTrips")]
+        public List<TripView> GetUserTrips(string Username)
+        {
+            string userId = User.Identity.GetUserId();
+            var AppUser = db.Users.Find(userId);
+            if (Username != null && Username != "")
+            {
+                if (!db.Users.Where(x => x.UserName == Username).FirstOrDefault().UserSettings.Safemode)
+                {
+                    AppUser = db.Users.Where(x => x.UserName == Username).FirstOrDefault();
+                }
+                else {
+                    return null;
+                }
+            }
+            
+            var trips = AppUser.Trips;
+            List<TripView> mytrips = new List<TripView>();
+            if (trips != null) {
+                foreach (Trip trip in trips) {
+                    List<LocationEntryViewModel> levms = mapLocationEntrytoViewModel(trip);
+                    TripView tripView = new TripView()
+                    {
+                        Description = trip.Description,
+                        PlannedDuration = trip.PlannedDuration,
+                        Destination = trip.Destination,
+                        StartDate = trip.StartDate.ToString(),
+                        TripMates = trip.TripMates,
+                        TripName = trip.TripName,
+                        TripEntries = levms,
+                        TripID = trip.TripID
+                    };
+                    mytrips.Add(tripView);
+                }
+            }
+            return mytrips;
+        }
+        [HttpGet]
+        [Route("goIncognito")]
+        public IHttpActionResult goIncognito() {
+            try {
+                string userId = User.Identity.GetUserId();
+                var AppUser = db.Users.Find(userId);
+                if (!AppUser.UserSettings.Safemode)
+                {
+                    AppUser.UserSettings.Safemode = true;
+                    db.SaveChanges();
+                }
+                else {
+                    AppUser.UserSettings.Safemode = false;
+                    db.SaveChanges();
+                }
+                return Ok();
+            } catch (Exception e) {
+                return BadRequest(e.Message);
+            }
+        }
+        [HttpGet]
+        [Route("getIncognito")]
+        public IHttpActionResult getIncognito()
+        {
+            try
+            {
+                string userId = User.Identity.GetUserId();
+                var AppUser = db.Users.Find(userId);
+                if (AppUser.UserSettings.Safemode)
+                {
+                    return Ok();
+                }
+                else
+                {
+                    return BadRequest();
+                }
+            }
+            catch (Exception e)
+            {
+                return BadRequest(e.Message);
+            }
+        }
+        //GET api/User/GetTrips
+        [Route("GetTrips")]
         public List<TripView> GetTrips()
         {
-            return null;
+            string userId = User.Identity.GetUserId();
+            var AppUser = db.Users.Find(userId);
+            var trips = AppUser.Trips;
+            List<TripView> mytrips = new List<TripView>();
+            if (trips != null)
+            {
+                foreach (Trip trip in trips)
+                {
+                    List<LocationEntryViewModel> levms = mapLocationEntrytoViewModel(trip);
+                    TripView tripView = new TripView()
+                    {
+                        Description = trip.Description,
+                        PlannedDuration = trip.PlannedDuration,
+                        Destination = trip.Destination,
+                        StartDate = trip.StartDate.ToString(),
+                        TripMates = trip.TripMates,
+                        TripName = trip.TripName,
+                        TripEntries = levms,
+                        TripID = trip.TripID
+                    };
+                    mytrips.Add(tripView);
+                }
+            }
+            return mytrips;
         }
-        //GET api/User/TripInfo
-        [Route("TripInfo")]
-        public Trip TripInfo(long tripID)
+        private List<LocationEntryViewModel> mapLocationEntrytoViewModel(Trip trip)
         {
-            return null;
+            List<LocationEntryViewModel> levms = new List<LocationEntryViewModel>();
+            foreach (LocationEntry entry in trip.TripEntries) {
+                LocationEntryViewModel levm = new LocationEntryViewModel()
+                {
+                    Address = entry.Location.DisplayFriendlyName,
+                    Comments = entry.Comments,
+                    DateCreated = entry.DateCreated.ToString(),
+                    Latitude = entry.Location.Latitude,
+                    Longitude = entry.Location.Longitude,
+                    tripName = trip.TripName,
+                    LocationEntryID = entry.DiaryEntryID,
+                    BadgeNames = entry.LocationBadge.Select(x => x.BadgeName).ToList(),
+                    CheckIns = entry.Visits.Select(x => x.DateCreated.ToString()).ToList()
+                };
+                levms.Add(levm);
+            }
+            return levms;
+        }
+
+        [HttpPost]
+        [Route("emergencyCheckIn")]
+        public IHttpActionResult emergencyCheckIn(LocationEntryViewModel entry) {
+            var userId = User.Identity.GetUserId();
+            var AppUser = db.Users.Find(userId);
+            LocationEntry location = new LocationEntry();
+            location.Comments = entry.Comments;
+            location.DateCreated = DateTime.Now;
+            location.Location = new Location() {
+                DisplayFriendlyName = entry.Address,
+                Latitude = entry.Latitude,
+                Longitude = entry.Longitude             
+            };
+            AppUser.emergencyCheckIn = location;
+            db.SaveChanges();
+            return Ok();
+        }
+        [HttpGet]
+        [Route("getEmergencyCheckIn")]
+        public LocationEntryViewModel getEmergencyCheckIn(string Username)
+        {
+            var userId = User.Identity.GetUserId();
+            var AppUser = db.Users.FirstOrDefault(x=>x.UserName == Username);
+            LocationEntryViewModel loc = new LocationEntryViewModel();
+            LocationEntry entry = AppUser.emergencyCheckIn;
+            if (entry == null)
+            {
+                return null;
+            }
+            else {
+                loc.Address = entry.Location.DisplayFriendlyName;
+                loc.Comments = entry.Comments;
+                loc.DateCreated = entry.DateCreated.ToString();
+                loc.Latitude = entry.Location.Latitude;
+                loc.Longitude = entry.Location.Longitude;
+            }
+            return loc;
+        }
+        [HttpPost]
+        [Route("createTrip")]
+        public IHttpActionResult createTrip(TripView tripView)
+        {
+            try
+            {
+                var userId = User.Identity.GetUserId();
+                var AppUser = db.Users.Find(userId);
+                Trip trip = new Trip()
+                {
+                    Description = tripView.Description,
+                    PlannedDuration = tripView.PlannedDuration,
+                    Destination = tripView.Destination,
+                    StartDate = DateTime.Now,
+                    TripName = tripView.TripName,
+                    TripMates = tripView.TripMates
+                };
+                AppUser.Trips.Add(trip);
+                db.SaveChanges();
+                return Ok();
+            }
+            catch (Exception e)
+            {
+                return BadRequest(e.Message);
+            }
         }
     }
 
-    public class TripView
-    {
-    }
+    
 }
